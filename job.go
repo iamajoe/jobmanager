@@ -57,16 +57,15 @@ func (j *jobInternal) Start(done chan bool) {
 }
 
 func (j *jobInternal) Stop() {
+	if isRunning, _, _ := j.original.GetStatus(); isRunning {
+		j.original.Stop()
+	}
+
 	if !j.isRunning {
 		return
 	}
 
 	j.isRunning = false
-
-	if isRunning, _, _ := j.original.GetStatus(); isRunning {
-		j.original.Stop()
-	}
-
 	j.closeChannel()
 }
 

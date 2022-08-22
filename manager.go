@@ -42,6 +42,10 @@ func (m *JobManager) addToDone(job jobInternal) {
 }
 
 func (m *JobManager) removeFromPool(id int) {
+	if m.runningPool == nil {
+		return
+	}
+
 	if job, ok := m.runningPool[id]; ok {
 		job.Stop()
 		delete(m.runningPool, id)
@@ -52,7 +56,7 @@ func (m *JobManager) removeFromPool(id int) {
 }
 
 func (m *JobManager) addToPool(job jobInternal) {
-	if job.GetStatus().IsDone {
+	if job.GetStatus().IsDone || m.runningPool == nil {
 		m.addToDone(job)
 		return
 	}
@@ -104,6 +108,10 @@ func (m *JobManager) addToQueue(job jobInternal, isStart bool) {
 }
 
 func (m *JobManager) runNewJob() {
+	if m.runningPool == nil {
+		return
+	}
+
 	if len(m.runningPool) >= m.maxWorkers || len(m.queueLine) == 0 || !m.isRunning {
 		return
 	}
@@ -154,8 +162,11 @@ func (m *JobManager) GetStatus() map[int]jobStatus {
 	for _, job := range m.doneJobs {
 		list[job.id] = job.GetStatus()
 	}
-	for _, job := range m.runningPool {
-		list[job.id] = job.GetStatus()
+
+	if m.runningPool != nil {
+		for _, job := range m.runningPool {
+			list[job.id] = job.GetStatus()
+		}
 	}
 	for _, job := range m.queueLine {
 		list[job.id] = job.GetStatus()
@@ -188,8 +199,10 @@ func (m *JobManager) Stop() {
 	m.isRunning = false
 
 	// get all running jobs back to the queue line
-	for _, job := range m.runningPool {
-		m.addToQueue(job, true)
+	if m.runningPool != nil {
+		for _, job := range m.runningPool {
+			m.addToQueue(job, true)
+		}
 	}
 
 	// end the process

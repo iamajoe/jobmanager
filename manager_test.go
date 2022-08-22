@@ -135,7 +135,7 @@ func TestJobManager_removeFromPool(t *testing.T) {
 		fields            fields
 		args              args
 		expectQueueLength int
-		expectInRunning   bool
+		expectInRunning   int
 		expectJobRunning  bool
 		expectDoneLength  int
 		expectDoneStatus  bool
@@ -143,16 +143,19 @@ func TestJobManager_removeFromPool(t *testing.T) {
 
 	tests := []testStruct{
 		func() testStruct {
-			job := jobInternal{id: 11, original: &testJob{}}
+			job0 := jobInternal{id: 10, original: &testJob{}}
+			job1 := jobInternal{id: 11, original: &testJob{}}
+
 			runningPool := make(map[int]jobInternal)
-			runningPool[job.id] = job
+			runningPool[job0.id] = job0
+			runningPool[job1.id] = job1
 
 			return testStruct{
 				name:              "runs and removes from running list",
 				fields:            fields{runningPool: runningPool},
-				args:              args{job},
+				args:              args{job1},
 				expectQueueLength: 0,
-				expectInRunning:   false,
+				expectInRunning:   job0.id,
 				expectJobRunning:  false,
 				expectDoneLength:  0,
 				expectDoneStatus:  false,
@@ -168,7 +171,7 @@ func TestJobManager_removeFromPool(t *testing.T) {
 				fields:            fields{runningPool: runningPool},
 				args:              args{job},
 				expectQueueLength: 0,
-				expectInRunning:   false,
+				expectInRunning:   -1,
 				expectJobRunning:  false,
 				expectDoneLength:  0,
 				expectDoneStatus:  false,
@@ -183,7 +186,7 @@ func TestJobManager_removeFromPool(t *testing.T) {
 				fields:            fields{runningPool: runningPool},
 				args:              args{job},
 				expectQueueLength: 0,
-				expectInRunning:   false,
+				expectInRunning:   -1,
 				expectJobRunning:  true,
 				expectDoneLength:  0,
 				expectDoneStatus:  false,
@@ -207,8 +210,14 @@ func TestJobManager_removeFromPool(t *testing.T) {
 			}
 
 			if m.runningPool != nil {
-				if _, ok := m.runningPool[tt.args.job.id]; ok != tt.expectInRunning {
-					t.Errorf("in running = %v, want %v", ok, tt.expectInRunning)
+				if _, ok := m.runningPool[tt.args.job.id]; ok {
+					t.Error("it wasnt removed from the pool")
+				}
+
+				if tt.expectInRunning != -1 {
+					if _, ok := m.runningPool[tt.expectInRunning]; !ok {
+						t.Errorf("in running = %v, want %v", ok, tt.expectInRunning)
+					}
 				}
 			}
 

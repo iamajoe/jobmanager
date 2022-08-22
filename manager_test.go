@@ -178,7 +178,7 @@ func TestJobManager_removeFromPool(t *testing.T) {
 			}
 		}(),
 		func() testStruct {
-			job := jobInternal{id: 12, original: &testJob{isRunning: true}}
+			job := jobInternal{id: 13, original: &testJob{isRunning: true}}
 			runningPool := make(map[int]jobInternal)
 
 			return testStruct{

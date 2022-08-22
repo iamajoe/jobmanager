@@ -56,8 +56,12 @@ func (m *JobManager) removeFromPool(id int) {
 }
 
 func (m *JobManager) addToPool(job jobInternal) {
-	if job.GetStatus().IsDone || m.runningPool == nil {
+	if job.GetStatus().IsDone {
 		m.addToDone(job)
+		return
+	}
+
+	if m.runningPool == nil {
 		return
 	}
 

@@ -6,7 +6,7 @@ import (
 )
 
 type JobManager struct {
-	idCount int
+	idCount     int
 	isRunning   bool
 	maxDone     int
 	maxWorkers  int
@@ -134,10 +134,10 @@ func (m *JobManager) Remove(id int) {
 func (m *JobManager) Add(job Job) int {
 	// reset the id count when too big so we don't have issues
 	m.idCount = m.idCount + 1
-	if m.idCount >= math.MaxInt - 1 {
+	if m.idCount >= math.MaxInt-1 {
 		m.idCount = 0
 	}
-	
+
 	jobInt := jobInternal{
 		id:       m.idCount,
 		original: job,

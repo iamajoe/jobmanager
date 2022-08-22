@@ -19,17 +19,29 @@ type jobInternal struct {
 	done      *chan bool
 }
 
+func (j *jobInternal) closeChannel() {
+	if j.done != nil {
+		*j.done <- true
+		close(*j.done)
+		j.done = nil
+	}
+}
+
 func (j *jobInternal) Start(done chan bool) {
 	// no need to go further if already done
 	if j.GetStatus().IsDone {
+		j.closeChannel()
+
 		done <- true
+		close(done)
 		return
 	}
 
-	// make sure it is stopped first, we want to make sure
-	// the channels went through in case we are starting
-	// on top of another start
-	j.Stop()
+	// we want to make sure that if it was already running
+	// we substitute the channels
+	if j.isRunning {
+		j.closeChannel()
+	}
 
 	// we run on a different thread so we can control the
 	// channel on this side and leave the jobs to run sync
@@ -40,8 +52,7 @@ func (j *jobInternal) Start(done chan bool) {
 		j.isRunning = true
 
 		j.original.Start()
-		*j.done <- true
-		j.done = nil
+		j.Stop()
 	}()
 }
 
@@ -50,13 +61,13 @@ func (j *jobInternal) Stop() {
 		return
 	}
 
-	if j.done != nil {
-		*j.done <- true
-		j.done = nil
+	j.isRunning = false
+
+	if isRunning, _, _ := j.original.GetStatus(); isRunning {
+		j.original.Stop()
 	}
 
-	j.original.Stop()
-	j.isRunning = false
+	j.closeChannel()
 }
 
 func (j *jobInternal) GetStatus() jobStatus {

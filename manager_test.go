@@ -569,78 +569,140 @@ func TestJobManager_runNewJob(t *testing.T) {
 
 func TestJobManager_Remove(t *testing.T) {
 	type fields struct {
-		idCount     int
-		isRunning   bool
-		maxDone     int
-		maxWorkers  int
 		queueLine   []jobInternal
 		runningPool map[int]jobInternal
-		doneJobs    []jobInternal
-		processWg   *sync.WaitGroup
 	}
 	type args struct {
-		id int
+		job jobInternal
 	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		// TODO: Add test cases.
+	type testStruct struct {
+		name                string
+		fields              fields
+		args                args
+		expectQueueLength   int
+		expectRunningLength int
+	}
+
+	tests := []testStruct{
+		func() testStruct {
+			job0 := jobInternal{id: 11, original: &testJob{isRunning: true}}
+			job1 := jobInternal{id: 12, original: &testJob{isRunning: true}}
+			job2 := jobInternal{id: 13, original: &testJob{isRunning: true}}
+			job3 := jobInternal{id: 14, original: &testJob{isRunning: true}}
+
+			runningPool := make(map[int]jobInternal)
+			runningPool[job0.id] = job0
+			runningPool[job1.id] = job1
+
+			return testStruct{
+				name: "removes from queue, pool and stops: example 1",
+				fields: fields{
+					runningPool: runningPool,
+					queueLine:   []jobInternal{job2, job3},
+				},
+				args:                args{job0},
+				expectQueueLength:   2,
+				expectRunningLength: 1,
+			}
+		}(),
+		func() testStruct {
+			job0 := jobInternal{id: 11, original: &testJob{isRunning: true}}
+			job1 := jobInternal{id: 12, original: &testJob{isRunning: true}}
+			job2 := jobInternal{id: 13, original: &testJob{isRunning: true}}
+			job3 := jobInternal{id: 14, original: &testJob{isRunning: true}}
+
+			runningPool := make(map[int]jobInternal)
+			runningPool[job0.id] = job0
+			runningPool[job1.id] = job1
+
+			return testStruct{
+				name: "removes from queue, pool and stops: example 2",
+				fields: fields{
+					runningPool: runningPool,
+					queueLine:   []jobInternal{job2, job3},
+				},
+				args:                args{job2},
+				expectQueueLength:   1,
+				expectRunningLength: 2,
+			}
+		}(),
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &JobManager{
-				idCount:     tt.fields.idCount,
-				isRunning:   tt.fields.isRunning,
-				maxDone:     tt.fields.maxDone,
-				maxWorkers:  tt.fields.maxWorkers,
 				queueLine:   tt.fields.queueLine,
 				runningPool: tt.fields.runningPool,
-				doneJobs:    tt.fields.doneJobs,
-				processWg:   tt.fields.processWg,
 			}
-			m.Remove(tt.args.id)
+			m.Remove(tt.args.job.id)
+
+			if len(m.runningPool) != tt.expectRunningLength {
+				t.Errorf("running array = %v, want %v", len(m.runningPool), tt.expectRunningLength)
+			}
+
+			if len(m.queueLine) != tt.expectQueueLength {
+				t.Errorf("queue array = %v, want %v", len(m.queueLine), tt.expectQueueLength)
+			}
+
+			if tt.args.job.isRunning {
+				t.Errorf("job isRunning = %v, want %v", tt.args.job.isRunning, false)
+			}
 		})
 	}
 }
 
 func TestJobManager_Add(t *testing.T) {
 	type fields struct {
-		idCount     int
-		isRunning   bool
-		maxDone     int
-		maxWorkers  int
-		queueLine   []jobInternal
-		runningPool map[int]jobInternal
-		doneJobs    []jobInternal
-		processWg   *sync.WaitGroup
+		idCount int
 	}
 	type args struct {
 		job Job
 	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   int
-	}{
-		// TODO: Add test cases.
+	type testStruct struct {
+		name                string
+		fields              fields
+		args                args
+		expectQueueLength   int
+		expectRunningLength int
+	}
+
+	tests := []testStruct{
+		func() testStruct {
+			return testStruct{
+				name:                "adds job to the queue",
+				fields:              fields{idCount: 10},
+				args:                args{&testJob{isRunning: false}},
+				expectQueueLength:   2,
+				expectRunningLength: 1,
+			}
+		}(),
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &JobManager{
-				idCount:     tt.fields.idCount,
-				isRunning:   tt.fields.isRunning,
-				maxDone:     tt.fields.maxDone,
-				maxWorkers:  tt.fields.maxWorkers,
-				queueLine:   tt.fields.queueLine,
-				runningPool: tt.fields.runningPool,
-				doneJobs:    tt.fields.doneJobs,
-				processWg:   tt.fields.processWg,
+				idCount: tt.fields.idCount,
 			}
-			if got := m.Add(tt.args.job); got != tt.want {
-				t.Errorf("JobManager.Add() = %v, want %v", got, tt.want)
+
+			got := m.Add(tt.args.job)
+
+			if len(m.queueLine) != 1 {
+				t.Errorf("queue array = %v, want %v", len(m.queueLine), 1)
+				return
+			}
+
+			if got != tt.fields.idCount+1 {
+				t.Errorf("JobManager.Add() = %v, want %v", got, tt.fields.idCount+1)
+			}
+
+			if m.queueLine[0].id != got {
+				t.Errorf("m.queueLine[0].id = %v, want %v", got, tt.fields.idCount+1)
+			}
+
+			if !reflect.DeepEqual(m.queueLine[0].original, tt.args.job) {
+				t.Errorf("m.queueLine[0].original = %v, want %v", m.queueLine[0].original, tt.args.job)
+			}
+
+			if m.idCount != got {
+				t.Errorf("idCount = %v, want %v", m.idCount, got)
 			}
 		})
 	}
@@ -802,25 +864,56 @@ func TestJobManager_Stop(t *testing.T) {
 		doneJobs    []jobInternal
 		processWg   *sync.WaitGroup
 	}
-	tests := []struct {
-		name   string
-		fields fields
-	}{
-		// TODO: Add test cases.
+	type testStruct struct {
+		name                string
+		fields              fields
+		expectQueueLength   int
+		expectRunningLength int
+	}
+
+	tests := []testStruct{
+		func() testStruct {
+			job0 := jobInternal{id: 11, original: &testJob{isRunning: true}}
+			runningPool := make(map[int]jobInternal)
+			runningPool[job0.id] = job0
+
+			return testStruct{
+				name:                "runs",
+				fields:              fields{runningPool: runningPool},
+				expectQueueLength:   1,
+				expectRunningLength: 0,
+			}
+		}(),
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			processWg := &sync.WaitGroup{}
+			processWg.Add(1)
+
 			m := &JobManager{
-				idCount:     tt.fields.idCount,
-				isRunning:   tt.fields.isRunning,
-				maxDone:     tt.fields.maxDone,
-				maxWorkers:  tt.fields.maxWorkers,
+				isRunning:   true,
 				queueLine:   tt.fields.queueLine,
 				runningPool: tt.fields.runningPool,
-				doneJobs:    tt.fields.doneJobs,
-				processWg:   tt.fields.processWg,
+				processWg:   processWg,
 			}
+
 			m.Stop()
+
+			if len(m.runningPool) != tt.expectRunningLength {
+				t.Errorf("running array = %v, want %v", len(m.runningPool), tt.expectRunningLength)
+			}
+
+			if len(m.queueLine) != tt.expectQueueLength {
+				t.Errorf("queue array = %v, want %v", len(m.queueLine), tt.expectQueueLength)
+			}
+
+			if m.isRunning {
+				t.Errorf("isRunning = %v, want %v", m.isRunning, false)
+			}
+
+			if m.processWg != nil {
+				t.Errorf("processWg = %v, want %v", m.processWg, nil)
+			}
 		})
 	}
 }

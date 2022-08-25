@@ -210,6 +210,8 @@ func (m *JobManager) Stop() {
 	}
 
 	// end the process
-	m.processWg.Done()
-	m.processWg = nil
+	if m.processWg != nil {
+		m.processWg.Done()
+		m.processWg = nil
+	}
 }
